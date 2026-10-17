@@ -112,6 +112,23 @@ export function applyBargeInThresholdFromConfig(config: ConfigPayload) {
   $bargeInThresholdMultiplier.set(Number.isFinite(value) && value > 0 ? value : null)
 }
 
+// `voice.barge_in_speech_gate` — also require a gateway speech/noise verdict before
+// barge-in trips, so clatter and running water stop interrupting replies. Off by
+// default (`false` in DEFAULT_CONFIG); a malformed value keeps it off.
+export const $bargeInSpeechGate = atom<boolean>(false)
+
+// `voice.barge_in_speech_threshold` — Silero probability cutoff (0-1). `null` = default.
+export const $bargeInSpeechThreshold = atom<number | null>(null)
+
+/** Seed the barge-in speech gate prefs from a loaded config payload. */
+export function applyBargeInSpeechGateFromConfig(config: ConfigPayload) {
+  $bargeInSpeechGate.set(voiceValue(config, 'barge_in_speech_gate') === true)
+
+  const threshold = Number(voiceValue(config, 'barge_in_speech_threshold'))
+
+  $bargeInSpeechThreshold.set(Number.isFinite(threshold) && threshold > 0 && threshold < 1 ? threshold : null)
+}
+
 // `voice.silence_duration` (seconds) — how long the user must stay quiet
 // before the conversation loop treats the utterance as finished. Documented
 // default 3.0 (hermes_cli/config_defaults.py), honoured by the CLI/TUI/gateway

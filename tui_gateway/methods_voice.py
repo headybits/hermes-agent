@@ -709,6 +709,42 @@ def _(rid, params: dict) -> dict:
     return _owner_result(rid, "fed", bool(ok))
 
 
+@method("voice.speech_prob")
+def _(rid, params: dict) -> dict:
+    """Score client-captured PCM (base64 int16 mono LE, 16 kHz) for human speech vs noise.
+
+    The desktop barge-in monitor trips on loudness; it asks this to veto non-speech (pan
+    clanks, running water). Stateful per caller: feed frames in order. ``reset`` clears state.
+    Returns ``{"available": False}`` when the bundled VAD can't load so clients fall back to
+    loudness-only."""
+    from tools import speech_gate
+
+    owner = str(id(_caller_transport()))
+    if params.get("reset"):
+        speech_gate.drop_gate(owner)
+    if not speech_gate.available():
+        return _ok(rid, {"available": False})
+    raw_b64 = params.get("pcm") or params.get("pcm_b64") or ""
+    if not isinstance(raw_b64, str):
+        return _err(rid, 4001, "voice.speech_prob requires base64 pcm")
+    if params.get("sample_rate") is not None and int(params["sample_rate"]) not in (0, 16000):
+        return _err(rid, 4001, "voice.speech_prob only accepts 16 kHz PCM")
+    import base64
+    try:
+        pcm = base64.b64decode(raw_b64, validate=False) if raw_b64.strip() else b""
+    except ValueError as e:  # binascii.Error
+        return _err(rid, 4001, f"invalid base64 pcm: {e}")
+    if len(pcm) > 64000:  # soft cap: 2s of 16 kHz int16 mono
+        return _err(rid, 4001, "pcm frame too large")
+    try:
+        threshold = float(params["threshold"]) if params.get("threshold") is not None else None
+    except (TypeError, ValueError):
+        return _err(rid, 4001, "threshold must be a number")
+    gate = speech_gate.gate_for(owner, threshold)
+    prob = gate.feed(pcm)
+    return _ok(rid, {"available": True, "probability": round(prob, 4), "speech": gate.is_speech})
+
+
 def _voice_toggle_status(rid, params: dict) -> dict:
     # Mirrors CLI _show_voice_status: STT/TTS availability tells the user WHY voice isn't
     # working; record_key lets the TUI bind and display the shortcut.

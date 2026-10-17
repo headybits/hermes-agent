@@ -24,6 +24,7 @@
 //   trigger) so intra-word energy dips don't reset progress.
 
 import { closeMeterContext, meterContextsClosed } from '@/lib/mic-meter-context'
+import { type SpeechGate, startSpeechGate } from '@/lib/voice-speech-gate'
 import { $voiceSilenceMs } from '@/store/voice-prefs'
 
 const CALIBRATION_MS = 400
@@ -68,6 +69,16 @@ export interface BargeMonitorCallbacks {
    * null, or non-positive keeps the stock trigger levels.
    */
   thresholdMultiplier?: number | null
+  /**
+   * `voice.barge_in_speech_gate`. When true, loudness alone no longer trips the
+   * monitor: the gateway must also score the sound as human speech
+   * (`voice.speech_prob`). Fails open to loudness-only if it can't.
+   */
+  speechGate?: boolean
+  /** `voice.barge_in_speech_threshold` (0-1), Silero probability cutoff. */
+  speechThreshold?: number | null
+  /** Test seam: replaces the gateway-backed gate. */
+  createSpeechGate?: (context: AudioContext, source: MediaStreamAudioSourceNode) => SpeechGate
 }
 
 export interface BargeTriggerLevels {
@@ -88,11 +99,18 @@ export function bargeInTriggerLevels(thresholdMultiplier?: number | null): Barge
   return { floorMultiplier: FLOOR_MULTIPLIER * scale, playbackMinTrigger: PLAYBACK_MIN_TRIGGER_LEVEL * scale }
 }
 
+/** Loud enough AND (when a speech gate is armed) scored as human speech: a clank or running
+ *  water clears the loudness bar but not the speech bar. No gate = loudness only. */
+function isLoudSpeech(loudEnough: boolean, gate: SpeechGate | null): boolean {
+  return loudEnough && (gate?.isSpeech() ?? true)
+}
+
 export function monitorSpeechDuringPlayback(callbacks: BargeMonitorCallbacks): () => void {
   const { floorMultiplier, playbackMinTrigger } = bargeInTriggerLevels(callbacks.thresholdMultiplier)
   let disposed = false
   let stream: MediaStream | null = null
   let context: AudioContext | null = null
+  let speechGate: SpeechGate | null = null
   let frame: number | null = null
   let recorder: MediaRecorder | null = null
   let chunks: Blob[] = []
@@ -119,6 +137,8 @@ export function monitorSpeechDuringPlayback(callbacks: BargeMonitorCallbacks): (
 
     recorder = null
     chunks = []
+    speechGate?.stop()
+    speechGate = null
     closeMeterContext(context)
     context = null
     stream?.getTracks().forEach(track => track.stop())
@@ -217,7 +237,15 @@ export function monitorSpeechDuringPlayback(callbacks: BargeMonitorCallbacks): (
       context = new AudioContext()
       const analyser = context.createAnalyser()
       analyser.fftSize = 256
-      context.createMediaStreamSource(stream).connect(analyser)
+      const micSource = context.createMediaStreamSource(stream)
+
+      micSource.connect(analyser)
+
+      if (callbacks.speechGate) {
+        speechGate = callbacks.createSpeechGate
+          ? callbacks.createSpeechGate(context, micSource)
+          : startSpeechGate({ context, source: micSource, threshold: callbacks.speechThreshold ?? undefined })
+      }
 
       const data = new Uint8Array(analyser.fftSize)
       const floorSamples: number[] = []
@@ -306,7 +334,7 @@ export function monitorSpeechDuringPlayback(callbacks: BargeMonitorCallbacks): (
             pushFloorSample(level)
           }
 
-          const above = floorLocked && level >= trigger && now >= graceUntil
+          const above = isLoudSpeech(floorLocked && level >= trigger && now >= graceUntil, speechGate)
 
           recentAbove.push({ above, at: now })
 

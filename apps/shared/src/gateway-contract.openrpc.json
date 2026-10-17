@@ -4507,6 +4507,24 @@
       }
     },
     {
+      "name": "voice.speech_prob",
+      "summary": "Score client PCM for human speech vs noise (Silero VAD) so barge-in ignores clatter.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/VoiceSpeechProbParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/VoiceSpeechProbResult"
+        }
+      }
+    },
+    {
       "name": "voice.toggle",
       "summary": "/voice parity: report, flip voice mode on/off, or toggle speech output.",
       "params": [
@@ -46513,6 +46531,124 @@
         ],
         "title": "VoiceRecordStatus",
         "type": "string"
+      },
+      "VoiceSpeechProbParams": {
+        "additionalProperties": false,
+        "description": "``pcm`` (or ``pcm_b64``): base64 int16 mono little-endian, 16 kHz only. ``reset`` drops the\ncaller's stream state first; ``threshold`` overrides the speech cutoff (0-1).",
+        "properties": {
+          "pcm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pcm"
+          },
+          "pcm_b64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Pcm B64"
+          },
+          "sample_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sample Rate"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Threshold"
+          },
+          "reset": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reset"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "VoiceSpeechProbParams",
+        "type": "object"
+      },
+      "VoiceSpeechProbResult": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Probability"
+          },
+          "speech": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Speech"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "VoiceSpeechProbResult",
+        "type": "object"
       },
       "VoiceStatusPayload": {
         "additionalProperties": false,

@@ -18,7 +18,14 @@ import { isVoiceStopCommand } from '@/lib/voice-stop-word'
 import { isTtsEcho } from '@/lib/voice-tts-echo'
 import { notify, notifyError } from '@/store/notifications'
 import { $voicePlayback } from '@/store/voice-playback'
-import { $autoSpeakReplies, $bargeInEnabled, $bargeInThresholdMultiplier, $voiceSilenceMs } from '@/store/voice-prefs'
+import {
+  $autoSpeakReplies,
+  $bargeInEnabled,
+  $bargeInSpeechGate,
+  $bargeInSpeechThreshold,
+  $bargeInThresholdMultiplier,
+  $voiceSilenceMs
+} from '@/store/voice-prefs'
 
 import { useComposerScope } from '../scope'
 
@@ -611,6 +618,8 @@ export function useVoiceConversation({
     stopBargeMonitorRef.current = monitorSpeechDuringPlayback({
       isPlaying: () => $voicePlayback.get().status === 'speaking',
       thresholdMultiplier: $bargeInThresholdMultiplier.get(),
+      speechGate: $bargeInSpeechGate.get(),
+      speechThreshold: $bargeInSpeechThreshold.get(),
       onSpeech: () => {
         // Snapshot before playback is cut: the reply may be consumed by the
         // time the capture is transcribed.
