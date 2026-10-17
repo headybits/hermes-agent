@@ -1229,9 +1229,7 @@ DEFAULT_CONFIG = {
         "submit_mode": "direct",  # TUI: direct submits immediately; draft = editable transcript
         "max_recording_seconds": 120,
         "auto_tts": False,
-        # Desktop remote clients call STT/TTS providers DIRECTLY (config + key fetched over
-        # authenticated REST at session start) instead of relaying via the gateway.
-        "client_direct": True,
+        "client_direct": True,  # desktop calls STT/TTS providers directly (config fetched over REST), not via the gateway
         "beep_enabled": True,  # record start/stop beeps in CLI voice mode
         "beep_volume": 0.3,  # beep amplitude multiplier, 0.0-1.0
         "thinking_sound": True,  # ambient bubble sound while the agent works (volume = beep_volume)
@@ -1242,6 +1240,8 @@ DEFAULT_CONFIG = {
         "barge_in_grace_seconds": 0.5,
         # Speech trigger = quiet-room floor x this (floor calibrated BEFORE playback).
         "barge_in_threshold_multiplier": 3.0,
+        "barge_in_speech_gate": False,  # desktop: gateway Silero VAD must call a sound speech before barge-in trips
+        "barge_in_speech_threshold": 0.5,  # speech probability cutoff, 0-1
         # Saying EXACTLY one of these (case-insensitive, punctuation ignored) ends the voice chat
         # instead of going to the agent. [] disables.
         "stop_phrases": ["stop"],

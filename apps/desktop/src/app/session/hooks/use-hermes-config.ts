@@ -23,6 +23,7 @@ import { refreshVoiceLiveStatus } from '@/store/voice-live'
 import {
   applyAutoSpeakFromConfig,
   applyBargeInEnabledFromConfig,
+  applyBargeInSpeechGateFromConfig,
   applyBargeInThresholdFromConfig,
   applyThinkingSoundFromConfig,
   applyVoiceSilenceMsFromConfig,
@@ -157,6 +158,7 @@ export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
         applyVoiceStopPhraseFromConfig(config, defaults)
         applyBargeInEnabledFromConfig(config)
         applyBargeInThresholdFromConfig(config)
+        applyBargeInSpeechGateFromConfig(config)
         applyThinkingSoundFromConfig(config)
         applyVoiceSilenceMsFromConfig(config, defaults)
         // Resolved server-side (mode + whether a key resolves); non-critical.

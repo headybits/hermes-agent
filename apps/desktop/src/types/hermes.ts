@@ -512,6 +512,8 @@ export interface HermesConfig {
     thinking_sound?: unknown
     barge_in?: unknown
     barge_in_threshold_multiplier?: unknown
+    barge_in_speech_gate?: unknown
+    barge_in_speech_threshold?: unknown
     silence_duration?: unknown
   }
 }

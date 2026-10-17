@@ -3010,6 +3010,20 @@ export interface WakeFeedResult {
   reason?: string | null
   fed: boolean
 }
+/** ``pcm`` (or ``pcm_b64``): base64 int16 mono little-endian, 16 kHz only. ``reset`` drops the caller's stream state first; ``threshold`` overrides the speech cutoff (0-1). */
+export interface VoiceSpeechProbParams {
+  pcm?: string | null
+  pcm_b64?: string | null
+  sample_rate?: number | null
+  threshold?: number | null
+  reset?: boolean | null
+  profile?: string | null
+}
+export interface VoiceSpeechProbResult {
+  available: boolean
+  probability?: number | null
+  speech?: boolean | null
+}
 export interface SessionCreateParams {
   profile?: string | null
   cols?: number | null
@@ -5506,6 +5520,8 @@ export interface RpcMethods {
   'verification.status': { params: VerificationStatusParams; result: VerificationStatusResult }
   /** VAD-bounded push-to-talk; the transcript arrives as a voice.transcript event. */
   'voice.record': { params: VoiceRecordParams; result: VoiceRecordResult }
+  /** Score client PCM for human speech vs noise (Silero VAD) so barge-in ignores clatter. */
+  'voice.speech_prob': { params: VoiceSpeechProbParams; result: VoiceSpeechProbResult }
   /** /voice parity: report, flip voice mode on/off, or toggle speech output. */
   'voice.toggle': { params: VoiceToggleParams; result: VoiceToggleResult }
   /** Speak text through the backend TTS engine (barge-in aware). */
@@ -5775,6 +5791,7 @@ export const RPC_METHODS = [
   'vault.unlock',
   'verification.status',
   'voice.record',
+  'voice.speech_prob',
   'voice.toggle',
   'voice.tts',
   'wake.feed',

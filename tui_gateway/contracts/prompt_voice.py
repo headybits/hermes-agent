@@ -537,3 +537,25 @@ class WakeFeedResult(WakeOwnerResult):
 
 method("wake.feed", params=WakeFeedParams, result=WakeFeedResult,
        doc="Push client-captured PCM into the armed detector (mic-less remote backends).")
+
+
+class VoiceSpeechProbParams(Params):
+    """``pcm`` (or ``pcm_b64``): base64 int16 mono little-endian, 16 kHz only. ``reset`` drops the
+    caller's stream state first; ``threshold`` overrides the speech cutoff (0-1)."""
+
+    pcm: str | None = None
+    pcm_b64: str | None = None
+    sample_rate: int | None = None
+    threshold: float | None = None
+    reset: bool | None = None
+    profile: str | None = None
+
+
+class VoiceSpeechProbResult(Result):
+    available: bool  # false: bundled VAD can't load; clients fall back to loudness-only barge-in
+    probability: float | None = None
+    speech: bool | None = None
+
+
+method("voice.speech_prob", params=VoiceSpeechProbParams, result=VoiceSpeechProbResult,
+       doc="Score client PCM for human speech vs noise (Silero VAD) so barge-in ignores clatter.")
