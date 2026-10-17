@@ -134,3 +134,26 @@ def test_unavailable_model_reports_false(monkeypatch):
     assert speech_gate.available() is False
 
 
+
+
+def test_live_summary_is_logged_once_per_interval(caplog, monkeypatch):
+    """Proof-of-life for a live session: calls, max score and verdict, rate-limited."""
+    import logging
+
+    clock = [100.0]
+    monkeypatch.setattr(speech_gate.time, "monotonic", lambda: clock[0])
+    gate = speech_gate.SpeechGate()
+    frame = _pcm(_clatter(0.2))
+
+    with caplog.at_level(logging.INFO, logger=speech_gate.logger.name):
+        for _ in range(5):  # same instant: nothing logged yet
+            gate.feed(frame)
+        assert not [r for r in caplog.records if "speech gate:" in r.message]
+
+        clock[0] += speech_gate.LOG_INTERVAL_S + 0.1
+        gate.feed(frame)
+        lines = [r.message for r in caplog.records if "speech gate:" in r.message]
+
+    assert len(lines) == 1
+    assert "6 calls" in lines[0] and "speech_calls=0" in lines[0]
+    assert gate._log_calls == 0  # window reset after logging
