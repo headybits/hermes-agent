@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -25,6 +26,7 @@ SAMPLE_RATE = 16_000
 WINDOW = 512  # samples per Silero window at 16 kHz (32 ms)
 CONTEXT = 64  # trailing samples of the previous window the model expects prepended
 DEFAULT_THRESHOLD = 0.5
+LOG_INTERVAL_S = 1.0  # one INFO summary per stream per second while audio flows
 
 _session_lock = threading.Lock()
 _session = None
@@ -87,6 +89,10 @@ class SpeechGate:
         self._context = np.zeros((1, CONTEXT), dtype="float32")
         self._buffer = np.zeros(0, dtype="float32")
         self.probability = 0.0
+        self._log_started = time.monotonic()
+        self._log_calls = 0
+        self._log_max = 0.0
+        self._log_speech_calls = 0
 
     def reset(self) -> None:
         self.__init__(self.threshold)
@@ -107,7 +113,23 @@ class SpeechGate:
             out, self._h, self._c = session.run(None, {"input": model_in, "h": self._h, "c": self._c})
             self._context = window[:, -CONTEXT:]
             self.probability = float(out.reshape(-1)[-1])
+            self._log_max = max(self._log_max, self.probability)
+        self._log_calls += 1
+        self._log_speech_calls += self.is_speech
+        self._log_summary()
         return self.probability
+
+    def _log_summary(self) -> None:
+        """Rate-limited INFO line so a live session shows what the gate decides per second."""
+        now = time.monotonic()
+        if now - self._log_started < LOG_INTERVAL_S:
+            return
+        logger.info(
+            "speech gate: %d calls/%.1fs, max_prob=%.2f, last_prob=%.2f, speech_calls=%d, threshold=%.2f",
+            self._log_calls, now - self._log_started, self._log_max, self.probability,
+            self._log_speech_calls, self.threshold,
+        )
+        self._log_started, self._log_calls, self._log_max, self._log_speech_calls = now, 0, 0.0, 0
 
     @property
     def is_speech(self) -> bool:
