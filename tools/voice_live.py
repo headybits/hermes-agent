@@ -90,6 +90,18 @@ def voice_live_turn_note(context: str = "") -> str:
     return f"{VOICE_LIVE_TURN_NOTE}\n[Recent spoken conversation, newest last:\n{context}]"
 
 
+# Per-turn note for the CHAINED voice loop (CLI/TUI `/voice on`, Desktop voice conversation):
+# the model answers directly and that same text is spoken by TTS, so it must be speakable
+# itself — unlike VOICE_LIVE_TURN_NOTE above, there is no second voice model paraphrasing it.
+CHAINED_VOICE_TURN_NOTE = (
+    "[Voice input — this message was spoken and transcribed, and your reply will be spoken "
+    "aloud as-is: respond concisely and conversationally, 2-3 sentences max unless the user "
+    "asked for more detail. No code blocks, no markdown, no lists, no URLs or paths read out "
+    "character by character. Do the work with your tools as usual; only the final answer needs "
+    "to be speakable.]"
+)
+
+
 def _voice_section() -> dict[str, Any]:
     try:
         from hermes_cli.config import load_config

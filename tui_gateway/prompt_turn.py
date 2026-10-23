@@ -733,8 +733,13 @@ def _prepare_turn_input(sid: str, session: dict, st: _TurnRun, text: Any, images
     if take_speech_interrupted():
         run_message = _prepend_note(run_message, SPEECH_INTERRUPTED_NOTE)
     run_message = _prepend_note(run_message, _pending_reaction_notes(session))
-    agent._voice_turn_pending = bool(session.pop("voice_turn", False))  # auxiliary.voice_chat route
-    return prompt, _prepend_note(run_message, _hud_surface_note(session)), cols, streamer
+    voice_turn_active = bool(session.pop("voice_turn", False))  # auxiliary.voice_chat route
+    agent._voice_turn_pending = voice_turn_active
+    run_message = _prepend_note(run_message, _hud_surface_note(session))
+    if voice_turn_active:
+        from tools.voice_live import CHAINED_VOICE_TURN_NOTE
+        run_message = _prepend_note(run_message, CHAINED_VOICE_TURN_NOTE)
+    return prompt, run_message, cols, streamer
 
 
 def _invoke_agent(
