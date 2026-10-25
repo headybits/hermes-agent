@@ -23,6 +23,9 @@ die() { echo "build-mac-light: $*" >&2; exit 1; }
 
 [ "$(uname -s)" = "Darwin" ] || die "run this on macOS"
 command -v git >/dev/null || die "git not found (xcode-select --install)"
+# npm ci compiles native modules (node-pty) with node-gyp: needs make + clang.
+xcode-select -p >/dev/null 2>&1 && command -v make >/dev/null && command -v clang >/dev/null \
+  || die "Xcode Command Line Tools missing (run: xcode-select --install)"
 command -v node >/dev/null || die "node not found (needs ^22.22, ^24.11 or >=26)"
 command -v npm >/dev/null || die "npm not found"
 
