@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 # Build "Hermes Light" (the remote-only desktop client) for macOS from this checkout.
 #
-#   scripts/build-mac-light.sh [dmg|zip|pack]     (default: dmg)
+#   scripts/build-mac-light.sh [zip|dmg|pack]     (default: zip)
 #
-# Node-only path: no host Python needed (scripts/build-bundle.sh wants 3.11+).
+# zip and pack need only Node. dmg also needs a Python 3.11+ (dmgbuild runs on it):
+# set HERMES_PYTHON, or have python3.11+ on PATH (brew install python@3.12).
 # The app is built as a commit build ("Hermes Light <sha7>"): its own app ID and
 # userData dir, side by side with any installed Hermes, and no auto-update feed,
 # so an official release can never replace this patched build.
 # Output lands in apps/desktop/release/. The app is unsigned and not notarized.
 set -euo pipefail
 
-format="${1:-dmg}"
+format="${1:-zip}"
 case "$format" in
   dmg)  npm_script="dist:mac:dmg" ;;
   zip)  npm_script="dist:mac:zip" ;;
   pack) npm_script="pack" ;;
-  -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) echo "build-mac-light: format must be dmg, zip or pack" >&2; exit 2 ;;
 esac
 
@@ -43,6 +44,18 @@ node -e '
 if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   git status --short --untracked-files=all >&2
   die "the checkout has uncommitted changes; commit or stash them first"
+fi
+
+# dmgbuild is a Python tool; the packager runs it through HERMES_PYTHON.
+if [ "$format" = dmg ] && [ -z "${HERMES_PYTHON:-}" ]; then
+  for candidate in python3.14 python3.13 python3.12 python3.11 python3; do
+    if command -v "$candidate" >/dev/null 2>&1 &&
+       "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+      HERMES_PYTHON="$(command -v "$candidate")"; break
+    fi
+  done
+  [ -n "${HERMES_PYTHON:-}" ] || die "dmg needs Python 3.11+ (macOS ships 3.9). Use the default zip, or: brew install python@3.12"
+  export HERMES_PYTHON
 fi
 
 # pyproject.toml carries 0.0.0; the release version comes from the newest vX.Y.Z tag.
@@ -74,8 +87,9 @@ echo "build-mac-light: done. Artifacts in $repo/apps/desktop/release:"
 ls -1 "$repo/apps/desktop/release" 2>/dev/null || true
 cat <<EOF
 
-Install: open the DMG and drag "Hermes Light $short" to Applications. It is unsigned, so
-clear the quarantine flag once (or right-click > Open):
+Install: zip: double-click the .zip and move "Hermes Light $short.app" to Applications.
+dmg: open it and drag the app to Applications. pack: the .app is under mac*/ in release.
+It is unsigned, so clear the quarantine flag once (or right-click > Open):
 
   xattr -dr com.apple.quarantine "/Applications/Hermes Light $short.app"
 
