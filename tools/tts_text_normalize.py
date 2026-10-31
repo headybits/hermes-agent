@@ -40,7 +40,8 @@ _DEGREE_UNITS = (("C", "Celsius"), ("F", "Fahrenheit"))
 # Unit suffix (regex, after a digit) -> spoken word; km/h variants before the bare "m".
 _UNIT_WORDS = (
     (r"km\s*/\s*h", "kilometres per hour"), (r"km/h", "kilometres per hour"),
-    (r"mm", "millimetres"), (r"cm", "centimetres"), (r"m", "metres"))
+    # Bare "m" is lowercase only: "82M" / "8M" are millions, not metres.
+    (r"mm", "millimetres"), (r"cm", "centimetres"), (r"(?-i:m)", "metres"))
 # Currency prefix (regex) -> spoken word; order matters (NZ$/A$/US$ before bare $).
 _CURRENCY_WORDS = (
     (r"NZ\$", "New Zealand dollars", re.IGNORECASE), (r"A\$", "Australian dollars", re.IGNORECASE),
@@ -124,8 +125,13 @@ def normalize_symbols_for_tts(text: str) -> str:
     text = re.sub(r"(?<=\d)\s*%", " percent", text)
     # Operators and separators that commonly leak from formatted answers.
     text = re.sub("[•◦▪▫]", " ", text.replace("&", " and "))  # bullet glyphs
-    for symbol, word in (("→", " to "), ("⇒", " to "), ("≈", " about "), ("~", " about ")):
+    for symbol, word in (("→", " to "), ("⇒", " to "), ("≈", " about ")):
         text = text.replace(symbol, word)
+    # "~" is "about" only as an approximation before a number ("~5", "~ 5");
+    # an "about" already in front ("about ~5") is not doubled. Any other "~" is
+    # silent, as on the desktop mirror, so the voice never says "tilde".
+    text = re.sub(r"(\babout\s*)?~\s*(?=[-+]?\d)", lambda m: m.group(1) or " about ", text, flags=re.IGNORECASE)
+    text = text.replace("~", " ")
     return _EMOJI_RE.sub("", _VARIATION_SELECTOR_RE.sub("", text))
 
 
@@ -184,6 +190,21 @@ def prune_identifier_tokens_for_tts(text: str) -> str:
     text = _HASH_PREFIX_HEX_RE.sub(" ", text)
     return _IDENTIFIER_TOKEN_RE.sub(
         lambda m: " " if _is_dense_identifier(m.group(0)) else m.group(0), text)
+
+
+def silence_paths_for_tts(text: str) -> str:
+    """Silence filesystem paths before the symbols pass expands "~", units and rates
+    inside them ("~/v2/x" -> "about per x"). Only tokens prune_identifier_tokens_for_tts
+    would silence anyway, so the desktop mirror (no symbols pass) is unaffected; a lone
+    "/month" is left for the rates pass ("$5 /month")."""
+    if not text:
+        return ""
+
+    def silence(match: re.Match) -> str:
+        token = match.group(0)
+        is_path = token.startswith(("~/", "./", "../")) or (token.startswith("/") and "/" in token[1:])
+        return " " if is_path and _is_dense_identifier(token) else token
+    return _IDENTIFIER_TOKEN_RE.sub(silence, text)
 
 
 def smooth_whitespace_for_tts(text: str) -> str:
@@ -282,11 +303,11 @@ def flatten_newlines_for_payload(text: str) -> str:
 
 def prepare_spoken_text(text: str, max_chars: int | None = 4000) -> str:
     """Return a TTS-friendly script from assistant text (deterministic cleanup, not a rewrite).
-    Pipeline: non-spoken blocks > Markdown > symbols/units > identifier-dense tokens >
+    Pipeline: non-spoken blocks > Markdown > paths > symbols/units > identifier-dense tokens >
     line formatting into sentence pauses > single line (for newline-sensitive providers),
     then ``max_chars``."""
     spoken = text
-    for step in (strip_nonspoken_blocks, strip_markdown_for_tts, normalize_symbols_for_tts,
+    for step in (strip_nonspoken_blocks, strip_markdown_for_tts, silence_paths_for_tts, normalize_symbols_for_tts,
                  prune_identifier_tokens_for_tts,
                  smooth_whitespace_for_tts, flatten_newlines_for_payload):
         spoken = step(spoken)

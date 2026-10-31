@@ -49,6 +49,46 @@ def test_prepare_spoken_text_polish_edge_cases():
     assert "2026/06/02" in prepare_spoken_text("due 2026/06/02 ok")
 
 
+def test_prepare_spoken_text_leaves_uppercase_m_counts_alone():
+    # "82M" / "8M" are millions (parameters, users), not metres.
+    assert prepare_spoken_text("Kokoro-82M is 327 MB") == "Kokoro-82M is 327 MB"
+    assert prepare_spoken_text("a 70B model, 8M params, 5m away") == "a 70B model, 8M params, 5 metres away"
+    assert prepare_spoken_text("100M users") == "100M users"
+    assert prepare_spoken_text("5M vs 5m") == "5M vs 5 metres"
+    assert prepare_spoken_text("1.5M rows, 5 M rows") == "1.5M rows, 5 M rows"
+    assert prepare_spoken_text("5 MB over 2Mbps") == "5 MB over 2Mbps"
+
+
+def test_prepare_spoken_text_still_expands_length_units():
+    assert prepare_spoken_text("5m, 10 cm, 3mm and 90 km/h") == (
+        "5 metres, 10 centimetres, 3 millimetres and 90 kilometres per hour")
+
+
+def test_prepare_spoken_text_reads_tilde_as_about_only_before_a_number():
+    assert prepare_spoken_text("roughly ~5 minutes") == "roughly about 5 minutes"
+    assert prepare_spoken_text("wait ~ 5 minutes") == "wait about 5 minutes"
+    assert prepare_spoken_text("~$5 each") == "about 5 dollars each"
+    # An "about" already in the prose is not doubled.
+    assert prepare_spoken_text("about ~5 minutes") == "about 5 minutes"
+    assert prepare_spoken_text("~5km away").startswith("about 5")
+    # Without a number, "~" is silent: never "about", never a spoken "tilde".
+    assert prepare_spoken_text("~") == ""
+    assert prepare_spoken_text("it's ~ fine") == "it's fine"
+    assert prepare_spoken_text("~/notes is home, see ~/") == "is home, see"
+
+
+def test_prepare_spoken_text_silences_paths_before_symbol_expansion():
+    # Symbol/unit/rate expansion must not run inside a path: "~" became
+    # "about", "2026/build" became "2026 per build", "5m/" became "5 metres/".
+    assert prepare_spoken_text("config in ~/.hermes/profiles/jay/config.yaml today") == "config in today"
+    assert prepare_spoken_text("run ./scripts/build.sh now") == "run now"
+    assert prepare_spoken_text("run ./scripts/2026/build.sh now") == "run now"
+    assert prepare_spoken_text("cd ~/v2/notes now") == "cd now"
+    assert prepare_spoken_text("logs in /tmp/5m/run now") == "logs in now"
+    # A spaced rate is not a path.
+    assert prepare_spoken_text("$5 /month") == "5 dollars per month"
+
+
 def test_prepare_spoken_text_strips_media_file_links():
     # "Open inference-server-shopping-list.xlsx" style tokens must never reach
     # the voice: hyphenated slugs + odd extensions make TTS loop ("eeeeee").
